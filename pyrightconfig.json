@@ -1,0 +1,4 @@
+{
+  "include": ["theor_problem/src", "theor_problem/tests"],
+  "extraPaths": ["theor_problem/src"]
+}

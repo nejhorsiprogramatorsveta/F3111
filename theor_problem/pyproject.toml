@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quantum-ising-visualization"
+version = "0.0.0"
+description = "Transverse-field quantum Ising calculations and classical Ising simulation."
+requires-python = ">=3.10"
+dependencies = [
+    "matplotlib",
+    "numpy",
+    "scipy",
+    "streamlit",
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

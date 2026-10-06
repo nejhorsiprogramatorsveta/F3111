@@ -1,0 +1,11 @@
+Metadata-Version: 2.4
+Name: quantum-ising-visualization
+Version: 0.0.0
+Summary: Transverse-field quantum Ising calculations and classical Ising simulation.
+Requires-Python: >=3.10
+Requires-Dist: matplotlib
+Requires-Dist: numpy
+Requires-Dist: scipy
+Requires-Dist: streamlit
+Provides-Extra: test
+Requires-Dist: pytest; extra == "test"
