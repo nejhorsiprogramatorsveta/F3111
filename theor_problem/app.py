@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 from pathlib import Path
 
 import numpy as np
@@ -14,6 +13,9 @@ from quantum_ising.visualization import SYSTEM_SIZES, VISUALIZATION_SIZE, quantu
 st.set_page_config(page_title="Quantum and Thermal Ising Project", layout="wide")
 
 ROOT = Path(__file__).resolve().parent
+MAIN_PLOT_WIDTH = 820
+SECONDARY_PLOT_WIDTH = 700
+PLOT_COLUMN_RATIOS = [1, 5, 1]
 
 
 @st.cache_resource(show_spinner=True)
@@ -38,6 +40,12 @@ def load_validation_summary() -> dict[str, object]:
     summary = run_validation_summary()
     save_validation_summary(summary, ROOT / OUTPUT_ROOT / "validation_summary.json")
     return summary
+
+
+def centered_plot(figure, *, width: int) -> None:
+    _, center_col, _ = st.columns(PLOT_COLUMN_RATIOS)
+    with center_col:
+        st.pyplot(figure, clear_figure=True, width=width)
 
 
 def initialize_state() -> None:
@@ -86,7 +94,7 @@ quantum_figure, quantum_summary = quantum_dashboard_figure(
     measurement_seed=st.session_state.measurement_seed,
     visualization_size=VISUALIZATION_SIZE,
 )
-st.pyplot(quantum_figure, clear_figure=True)
+centered_plot(quantum_figure, width=MAIN_PLOT_WIDTH)
 
 metric_cols = st.columns(5)
 metric_cols[0].metric("Computed g", f"{quantum_summary['g']:.2f}")
@@ -101,50 +109,55 @@ st.markdown(
 
 st.header("Finite-size transition analysis")
 transition_figure = transition_analysis_figure(dataset, transition_rows)
-st.pyplot(transition_figure, clear_figure=True)
+centered_plot(transition_figure, width=SECONDARY_PLOT_WIDTH)
 st.table(transition_rows)
 st.caption("The refined g* values are finite-size pseudo-critical indicators, not exact thermodynamic critical points.")
 
-st.header("Thermal Ising animation")
-st.caption("This classical 32x32 model is independent from the quantum calculation. Changing temperature preserves the existing lattice; only reset randomizes it.")
-model: ClassicalIsingModel = st.session_state.thermal_model
+@st.fragment(run_every=0.2)
+def render_thermal_animation() -> None:
+    st.header("Thermal Ising animation")
+    st.caption("This classical 32x32 model is independent from the quantum calculation. Changing temperature preserves the existing lattice; only reset randomizes it.")
+    model: ClassicalIsingModel = st.session_state.thermal_model
 
-thermal_temperature = st.slider(
-    "Temperature T",
-    min_value=0.5,
-    max_value=5.0,
-    value=float(model.temperature),
-    step=0.05,
-    help=f"Critical temperature reference: Tc = {CRITICAL_TEMPERATURE:.3f}",
-)
-model.set_temperature(thermal_temperature)
-st.session_state.thermal_speed = st.slider("Sweeps per frame", min_value=1, max_value=25, value=int(st.session_state.thermal_speed))
+    thermal_temperature = st.slider(
+        "Temperature T",
+        min_value=0.5,
+        max_value=5.0,
+        value=float(model.temperature),
+        step=0.05,
+        help=f"Critical temperature reference: Tc = {CRITICAL_TEMPERATURE:.3f}",
+    )
+    model.set_temperature(thermal_temperature)
+    st.session_state.thermal_speed = st.slider("Sweeps per frame", min_value=1, max_value=25, value=int(st.session_state.thermal_speed))
 
-play_col, pause_col, step_col, reset_col = st.columns(4)
-if play_col.button("Play"):
-    st.session_state.thermal_playing = True
-if pause_col.button("Pause"):
-    st.session_state.thermal_playing = False
-if step_col.button("Step once"):
-    model.run(sweeps=int(st.session_state.thermal_speed))
-    st.session_state.thermal_frame += 1
-if reset_col.button("Reset"):
-    st.session_state.thermal_resets += 1
-    model.reset(seed=2026 + st.session_state.thermal_resets)
+    play_col, pause_col, step_col, reset_col = st.columns(4)
+    if play_col.button("Play"):
+        st.session_state.thermal_playing = True
+    if pause_col.button("Pause"):
+        st.session_state.thermal_playing = False
+    if step_col.button("Step once"):
+        model.run(sweeps=int(st.session_state.thermal_speed))
+        st.session_state.thermal_frame += 1
+    if reset_col.button("Reset"):
+        st.session_state.thermal_resets += 1
+        model.reset(seed=2026 + st.session_state.thermal_resets)
 
-if st.session_state.thermal_playing:
-    model.run(sweeps=int(st.session_state.thermal_speed))
-    st.session_state.thermal_frame += 1
+    if st.session_state.thermal_playing:
+        model.run(sweeps=int(st.session_state.thermal_speed))
+        st.session_state.thermal_frame += 1
 
-thermal_figure = thermal_lattice_figure(model)
-st.pyplot(thermal_figure, clear_figure=True)
+    thermal_figure = thermal_lattice_figure(model)
+    centered_plot(thermal_figure, width=SECONDARY_PLOT_WIDTH)
 
-thermal_metrics = st.columns(5)
-thermal_metrics[0].metric("T", f"{model.temperature:.2f}")
-thermal_metrics[1].metric("|m|", f"{model.abs_magnetization():.4f}")
-thermal_metrics[2].metric("Tc", f"{CRITICAL_TEMPERATURE:.3f}")
-thermal_metrics[3].metric("Frames", f"{st.session_state.thermal_frame}")
-thermal_metrics[4].metric("Status", "Playing" if st.session_state.thermal_playing else "Paused")
+    thermal_metrics = st.columns(5)
+    thermal_metrics[0].metric("T", f"{model.temperature:.2f}")
+    thermal_metrics[1].metric("|m|", f"{model.abs_magnetization():.4f}")
+    thermal_metrics[2].metric("Tc", f"{CRITICAL_TEMPERATURE:.3f}")
+    thermal_metrics[3].metric("Frames", f"{st.session_state.thermal_frame}")
+    thermal_metrics[4].metric("Status", "Playing" if st.session_state.thermal_playing else "Paused")
+
+
+render_thermal_animation()
 
 st.header("Validation and numerical checks")
 st.json(validation_summary, expanded=False)
@@ -154,9 +167,7 @@ st.markdown(
     "- Weak transverse field preserves strong long-distance $z$ correlations even though $\\langle M_z \\rangle = 0$ in the finite even-parity ground state.\n"
     "- Strong transverse field drives $m_x \\to 1$ while $z$-basis measurements remain mixed because the state is a quantum superposition, not a thermal mixture.\n"
     "- The crossover sharpens with increasing $N$, and the peak of $\\chi_x$ defines a finite-size $g_\\star(N)$ near the known infinite-chain critical value $g_c = 1$.\n"
-    "- The lower panel is a separate classical stochastic relaxation problem controlled by temperature $T$, not by the quantum field $g$."
+    "- The lower panel is a separate classical stochastic relaxation problem controlled by temperature $T$, not by the quantum field $g$.\n"
+    "- SIX SEVEEN"
 )
 
-if st.session_state.thermal_playing:
-    time.sleep(0.2)
-    st.rerun()
